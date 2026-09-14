@@ -89,13 +89,13 @@ function AppRoutes() {
         />
 
         <Route
-          path="/restaurant-dashboard"
-          element={
-            <ProtectedRoute>
-              <RestaurantDashboard />
-            </ProtectedRoute>
-          }
-        />
+  path="/restaurant-dashboard"
+  element={
+    <ProtectedRoute role="restaurant">
+      <RestaurantDashboard />
+    </ProtectedRoute>
+  }
+/>
       </Routes>
     </BrowserRouter>
   );
