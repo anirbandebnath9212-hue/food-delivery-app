@@ -1,4 +1,5 @@
 const express = require("express");
+const requireRestaurantRole = require("../middleware/roleMiddleware");
 
 const {
   createOrder,
@@ -23,6 +24,7 @@ router.get("/my-orders", protect, getMyOrders);
 router.get(
   "/restaurant/:restaurantId",
   protect,
+  requireRestaurantRole,
   getRestaurantOrders
 );
 
@@ -33,6 +35,11 @@ router.get("/:id", protect, getOrderById);
 router.put("/:id/cancel", protect, cancelOrder);
 
 // Restaurant owner updates order status
-router.put("/:id/status", protect, updateOrderStatus);
+router.put(
+  "/:id/status",
+  protect,
+  requireRestaurantRole,
+  updateOrderStatus
+);
 
 module.exports = router;

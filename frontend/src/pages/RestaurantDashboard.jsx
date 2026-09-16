@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 function RestaurantDashboard() {
+  const navigate = useNavigate();
+
   const { user, token, isAuthenticated } = useAuth();
 
   const [restaurant, setRestaurant] = useState(null);
@@ -21,6 +23,8 @@ function RestaurantDashboard() {
     category: "",
     image: "",
   });
+
+  const [foodImage, setFoodImage] = useState(null);
 
   const [editingFoodId, setEditingFoodId] = useState(null);
 
@@ -53,12 +57,15 @@ function RestaurantDashboard() {
             String(user?.id || user?._id)
         );
 
-        if (!ownedRestaurant) {
-          setError(
-            "You don't have a restaurant associated with your account."
-          );
+        /* =========================
+           RESTAURANT SETUP REDIRECT
+        ========================= */
 
-          setLoading(false);
+        if (!ownedRestaurant) {
+          navigate("/restaurant-setup", {
+            replace: true,
+          });
+
           return;
         }
 
@@ -95,7 +102,12 @@ function RestaurantDashboard() {
     };
 
     fetchDashboard();
-  }, [token, isAuthenticated, user]);
+  }, [
+    token,
+    isAuthenticated,
+    user,
+    navigate,
+  ]);
 
   /* =========================
      FOOD FORM
@@ -109,6 +121,20 @@ function RestaurantDashboard() {
   };
 
   /* =========================
+     FOOD IMAGE
+  ========================= */
+
+  const handleFoodImageChange = (event) => {
+    const selectedImage = event.target.files[0];
+
+    if (!selectedImage) {
+      return;
+    }
+
+    setFoodImage(selectedImage);
+  };
+
+  /* =========================
      ADD FOOD
   ========================= */
 
@@ -119,13 +145,33 @@ function RestaurantDashboard() {
     setAddingFood(true);
 
     try {
+      const foodData = new FormData();
+
+      foodData.append("name", foodForm.name);
+      foodData.append(
+        "description",
+        foodForm.description
+      );
+      foodData.append(
+        "price",
+        Number(foodForm.price)
+      );
+      foodData.append(
+        "category",
+        foodForm.category
+      );
+      foodData.append(
+        "restaurant",
+        restaurant._id
+      );
+
+      if (foodImage) {
+        foodData.append("image", foodImage);
+      }
+
       const response = await api.post(
         "/foods",
-        {
-          ...foodForm,
-          price: Number(foodForm.price),
-          restaurant: restaurant._id,
-        },
+        foodData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -145,6 +191,15 @@ function RestaurantDashboard() {
         category: "",
         image: "",
       });
+
+      setFoodImage(null);
+
+      const imageInput =
+        document.getElementById("food-image");
+
+      if (imageInput) {
+        imageInput.value = "";
+      }
     } catch (error) {
       console.error(error);
 
@@ -172,6 +227,8 @@ function RestaurantDashboard() {
       image: food.image,
     });
 
+    setFoodImage(null);
+
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -182,55 +239,80 @@ function RestaurantDashboard() {
      UPDATE FOOD
   ========================= */
 
-  const handleUpdateFood = async (event) => {
-    event.preventDefault();
+const handleUpdateFood = async (event) => {
+  event.preventDefault();
 
-    setFoodError("");
-    setAddingFood(true);
+  setFoodError("");
+  setAddingFood(true);
 
-    try {
-      const response = await api.put(
-        `/foods/${editingFoodId}`,
-        {
-          ...foodForm,
-          price: Number(foodForm.price),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+  try {
+    const foodData = new FormData();
 
-      setFoods((currentFoods) =>
-        currentFoods.map((food) =>
-          food._id === editingFoodId
-            ? response.data.food
-            : food
-        )
-      );
+    foodData.append("name", foodForm.name);
+    foodData.append(
+      "description",
+      foodForm.description
+    );
+    foodData.append(
+      "price",
+      Number(foodForm.price)
+    );
+    foodData.append(
+      "category",
+      foodForm.category
+    );
 
-      setFoodForm({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        image: "",
-      });
-
-      setEditingFoodId(null);
-    } catch (error) {
-      console.error(error);
-
-      setFoodError(
-        error.response?.data?.message ||
-          "Failed to update food."
-      );
-    } finally {
-      setAddingFood(false);
+    // Send a new image only if the owner selected one
+    if (foodImage) {
+      foodData.append("image", foodImage);
     }
-  };
 
+    const response = await api.put(
+      `/foods/${editingFoodId}`,
+      foodData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    setFoods((currentFoods) =>
+      currentFoods.map((food) =>
+        food._id === editingFoodId
+          ? response.data.food
+          : food
+      )
+    );
+
+    setFoodForm({
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      image: "",
+    });
+
+    setFoodImage(null);
+    setEditingFoodId(null);
+
+    const imageInput =
+      document.getElementById("food-image");
+
+    if (imageInput) {
+      imageInput.value = "";
+    }
+  } catch (error) {
+    console.error(error);
+
+    setFoodError(
+      error.response?.data?.message ||
+        "Failed to update food."
+    );
+  } finally {
+    setAddingFood(false);
+  }
+};
   /* =========================
      DELETE FOOD
   ========================= */
@@ -320,7 +402,15 @@ function RestaurantDashboard() {
       image: "",
     });
 
+    setFoodImage(null);
     setFoodError("");
+
+    const imageInput =
+      document.getElementById("food-image");
+
+    if (imageInput) {
+      imageInput.value = "";
+    }
   };
 
   /* =========================
@@ -592,19 +682,33 @@ function RestaurantDashboard() {
 
               </div>
 
+              {/* FOOD IMAGE */}
+
               <div className="form-group">
                 <label htmlFor="food-image">
-                  Image URL
+                  Food Image
                 </label>
 
                 <input
                   id="food-image"
-                  type="url"
-                  name="image"
-                  value={foodForm.image}
-                  onChange={handleFoodChange}
-                  placeholder="https://..."
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFoodImageChange}
                 />
+
+                {foodImage && (
+                  <small>
+                    Selected: {foodImage.name}
+                  </small>
+                )}
+
+                {editingFoodId &&
+                  !foodImage &&
+                  foodForm.image && (
+                    <small>
+                      Current image will be kept.
+                    </small>
+                  )}
               </div>
 
               {foodError && (

@@ -10,25 +10,43 @@ const {
 } = require("../controllers/foodController");
 
 const protect = require("../middleware/authMiddleware");
+const requireRestaurantRole = require("../middleware/roleMiddleware");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
-// Create food
-router.post("/", protect, createFood);
+// Restaurant owner food management
+router.post(
+  "/",
+  protect,
+  requireRestaurantRole,
+  upload.single("image"),
+  createFood
+);
 
-// Get all food
+router.put(
+  "/:id",
+  protect,
+  requireRestaurantRole,
+  upload.single("image"),
+  updateFood
+);
+
+router.delete(
+  "/:id",
+  protect,
+  requireRestaurantRole,
+  deleteFood
+);
+
+// Public food routes
 router.get("/", getFoods);
 
-// Get food by restaurant
-router.get("/restaurant/:restaurantId", getFoodsByRestaurant);
+router.get(
+  "/restaurant/:restaurantId",
+  getFoodsByRestaurant
+);
 
-// Get single food
 router.get("/:id", getFoodById);
-
-// Update food
-router.put("/:id", protect, updateFood);
-
-// Delete food
-router.delete("/:id", protect, deleteFood);
 
 module.exports = router;

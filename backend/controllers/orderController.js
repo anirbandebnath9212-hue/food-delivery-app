@@ -9,15 +9,41 @@ const createOrder = async (req, res) => {
       restaurant,
       items,
       deliveryAddress,
+      paymentMethod,
     } = req.body;
 
-    if (!restaurant || !items || items.length === 0 || !deliveryAddress) {
+    if (
+      !restaurant ||
+      !items ||
+      items.length === 0 ||
+      !deliveryAddress
+    ) {
       return res.status(400).json({
-        message: "Restaurant, items and delivery address are required",
+        message:
+          "Restaurant, items and delivery address are required",
       });
     }
 
-    const existingRestaurant = await Restaurant.findById(restaurant);
+    const allowedPaymentMethods = [
+      "cash_on_delivery",
+      "online",
+    ];
+
+    const selectedPaymentMethod =
+      paymentMethod || "cash_on_delivery";
+
+    if (
+      !allowedPaymentMethods.includes(
+        selectedPaymentMethod
+      )
+    ) {
+      return res.status(400).json({
+        message: "Invalid payment method",
+      });
+    }
+
+    const existingRestaurant =
+      await Restaurant.findById(restaurant);
 
     if (!existingRestaurant) {
       return res.status(404).json({
@@ -26,10 +52,13 @@ const createOrder = async (req, res) => {
     }
 
     const orderItems = [];
+
     let totalPrice = 0;
 
     for (const item of items) {
-      const food = await Food.findById(item.food);
+      const food = await Food.findById(
+        item.food
+      );
 
       if (!food) {
         return res.status(404).json({
@@ -37,21 +66,30 @@ const createOrder = async (req, res) => {
         });
       }
 
-      if (food.restaurant.toString() !== restaurant.toString()) {
+      if (
+        food.restaurant.toString() !==
+        restaurant.toString()
+      ) {
         return res.status(400).json({
-          message: "All food items must belong to the selected restaurant",
+          message:
+            "All food items must belong to the selected restaurant",
         });
       }
 
       if (!food.isAvailable) {
         return res.status(400).json({
-          message: `${food.name} is currently unavailable`,
+          message:
+            `${food.name} is currently unavailable`,
         });
       }
 
-      if (!item.quantity || item.quantity < 1) {
+      if (
+        !item.quantity ||
+        item.quantity < 1
+      ) {
         return res.status(400).json({
-          message: `Invalid quantity for ${food.name}`,
+          message:
+            `Invalid quantity for ${food.name}`,
         });
       }
 
@@ -62,28 +100,51 @@ const createOrder = async (req, res) => {
         quantity: item.quantity,
       });
 
-      totalPrice += food.price * item.quantity;
+      totalPrice +=
+        food.price * item.quantity;
     }
+
+    /*
+      Online payment will be connected
+      to Razorpay later.
+
+      For now, both methods create the
+      order with pending payment status.
+    */
 
     const order = await Order.create({
       customer: req.user._id,
+
       restaurant,
+
       items: orderItems,
+
       totalPrice,
+
       deliveryAddress,
+
+      paymentMethod:
+        selectedPaymentMethod,
+
+      paymentStatus: "pending",
     });
 
     res.status(201).json({
       message: "Order created successfully",
+
       order,
     });
   } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       message: "Failed to create order",
+
       error: error.message,
     });
   }
 };
+
 
 // Get customer's orders
 const getMyOrders = async (req, res) => {
@@ -91,28 +152,48 @@ const getMyOrders = async (req, res) => {
     const orders = await Order.find({
       customer: req.user._id,
     })
-      .populate("restaurant", "name address")
-      .populate("items.food", "name image");
+      .populate(
+        "restaurant",
+        "name address"
+      )
+      .populate(
+        "items.food",
+        "name image"
+      );
 
     res.json({
       count: orders.length,
+
       orders,
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to get orders",
+
       error: error.message,
     });
   }
 };
 
+
 // Get single order for customer
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phone")
-      .populate("restaurant", "name address phone")
-      .populate("items.food", "name image");
+    const order = await Order.findById(
+      req.params.id
+    )
+      .populate(
+        "customer",
+        "name email phone"
+      )
+      .populate(
+        "restaurant",
+        "name address phone"
+      )
+      .populate(
+        "items.food",
+        "name image"
+      );
 
     if (!order) {
       return res.status(404).json({
@@ -121,10 +202,12 @@ const getOrderById = async (req, res) => {
     }
 
     if (
-      order.customer._id.toString() !== req.user._id.toString()
+      order.customer._id.toString() !==
+      req.user._id.toString()
     ) {
       return res.status(403).json({
-        message: "You are not authorized to view this order",
+        message:
+          "You are not authorized to view this order",
       });
     }
 
@@ -134,15 +217,19 @@ const getOrderById = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to get order",
+
       error: error.message,
     });
   }
 };
 
+
 // Cancel order
 const cancelOrder = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(
+      req.params.id
+    );
 
     if (!order) {
       return res.status(404).json({
@@ -150,41 +237,87 @@ const cancelOrder = async (req, res) => {
       });
     }
 
-    if (order.customer.toString() !== req.user._id.toString()) {
+    if (
+      order.customer.toString() !==
+      req.user._id.toString()
+    ) {
       return res.status(403).json({
-        message: "You are not authorized to cancel this order",
+        message:
+          "You are not authorized to cancel this order",
       });
     }
 
+
+    /* =========================
+       CANCELLATION RULE
+    ========================= */
+
+    const cancellableStatuses = [
+      "placed",
+      "confirmed",
+    ];
+
     if (
-      order.orderStatus === "delivered" ||
-      order.orderStatus === "cancelled"
+      !cancellableStatuses.includes(
+        order.orderStatus
+      )
     ) {
       return res.status(400).json({
-        message: "This order cannot be cancelled",
+        message:
+          "This order can no longer be cancelled",
       });
     }
+
 
     order.orderStatus = "cancelled";
 
     await order.save();
 
+
+    /* =========================
+       REAL-TIME UPDATE
+    ========================= */
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`order_${order._id}`).emit(
+        "orderStatusUpdated",
+        {
+          orderId: order._id.toString(),
+          status: "cancelled",
+        }
+      );
+    }
+
+
     res.json({
-      message: "Order cancelled successfully",
+      message:
+        "Order cancelled successfully",
+
       order,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to cancel order",
+      message:
+        "Failed to cancel order",
+
       error: error.message,
     });
   }
 };
 
+
 // Get restaurant orders
-const getRestaurantOrders = async (req, res) => {
+const getRestaurantOrders = async (
+  req,
+  res
+) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.restaurantId);
+    const restaurant =
+      await Restaurant.findById(
+        req.params.restaurantId
+      );
 
     if (!restaurant) {
       return res.status(404).json({
@@ -192,33 +325,52 @@ const getRestaurantOrders = async (req, res) => {
       });
     }
 
-    if (restaurant.owner.toString() !== req.user._id.toString()) {
+    if (
+      restaurant.owner.toString() !==
+      req.user._id.toString()
+    ) {
       return res.status(403).json({
-        message: "You are not authorized to view these orders",
+        message:
+          "You are not authorized to view these orders",
       });
     }
 
     const orders = await Order.find({
       restaurant: restaurant._id,
     })
-      .populate("customer", "name email phone")
-      .populate("items.food", "name image")
-      .sort({ createdAt: -1 });
+      .populate(
+        "customer",
+        "name email phone"
+      )
+      .populate(
+        "items.food",
+        "name image"
+      )
+      .sort({
+        createdAt: -1,
+      });
 
     res.json({
       count: orders.length,
+
       orders,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to get restaurant orders",
+      message:
+        "Failed to get restaurant orders",
+
       error: error.message,
     });
   }
 };
 
+
 // Update order status by restaurant owner
-const updateOrderStatus = async (req, res) => {
+const updateOrderStatus = async (
+  req,
+  res
+) => {
   try {
     const { status } = req.body;
 
@@ -231,13 +383,18 @@ const updateOrderStatus = async (req, res) => {
       "cancelled",
     ];
 
-    if (!status || !allowedStatuses.includes(status)) {
+    if (
+      !status ||
+      !allowedStatuses.includes(status)
+    ) {
       return res.status(400).json({
         message: "Invalid order status",
       });
     }
 
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(
+      req.params.id
+    );
 
     if (!order) {
       return res.status(404).json({
@@ -245,7 +402,10 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const restaurant = await Restaurant.findById(order.restaurant);
+    const restaurant =
+      await Restaurant.findById(
+        order.restaurant
+      );
 
     if (!restaurant) {
       return res.status(404).json({
@@ -253,21 +413,31 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    if (restaurant.owner.toString() !== req.user._id.toString()) {
+    if (
+      restaurant.owner.toString() !==
+      req.user._id.toString()
+    ) {
       return res.status(403).json({
-        message: "You are not authorized to update this order",
+        message:
+          "You are not authorized to update this order",
       });
     }
 
-    if (order.orderStatus === "cancelled") {
+    if (
+      order.orderStatus === "cancelled"
+    ) {
       return res.status(400).json({
-        message: "Cancelled orders cannot be updated",
+        message:
+          "Cancelled orders cannot be updated",
       });
     }
 
-    if (order.orderStatus === "delivered") {
+    if (
+      order.orderStatus === "delivered"
+    ) {
       return res.status(400).json({
-        message: "Delivered orders cannot be updated",
+        message:
+          "Delivered orders cannot be updated",
       });
     }
 
@@ -275,17 +445,40 @@ const updateOrderStatus = async (req, res) => {
 
     await order.save();
 
+
+    /* =========================
+       REAL-TIME STATUS UPDATE
+    ========================= */
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`order_${order._id}`).emit(
+        "orderStatusUpdated",
+        {
+          orderId: order._id.toString(),
+          status: order.orderStatus,
+        }
+      );
+    }
+
+
     res.json({
-      message: "Order status updated successfully",
+      message:
+        "Order status updated successfully",
+
       order,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to update order status",
+      message:
+        "Failed to update order status",
+
       error: error.message,
     });
   }
 };
+
 
 module.exports = {
   createOrder,

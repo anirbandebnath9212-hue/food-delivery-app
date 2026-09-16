@@ -25,9 +25,7 @@ const orderItemSchema = new mongoose.Schema(
       min: 1,
     },
   },
-  {
-    _id: false,
-  }
+  { _id: false }
 );
 
 const orderSchema = new mongoose.Schema(
@@ -46,12 +44,16 @@ const orderSchema = new mongoose.Schema(
 
     items: {
       type: [orderItemSchema],
+
       required: true,
+
       validate: {
         validator: function (items) {
           return items.length > 0;
         },
-        message: "Order must contain at least one item",
+
+        message:
+          "Order must contain at least one item",
       },
     },
 
@@ -67,14 +69,32 @@ const orderSchema = new mongoose.Schema(
       trim: true,
     },
 
+    paymentMethod: {
+      type: String,
+
+      enum: [
+        "cash_on_delivery",
+        "online",
+      ],
+
+      default: "cash_on_delivery",
+    },
+
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed"],
+
+      enum: [
+        "pending",
+        "paid",
+        "failed",
+      ],
+
       default: "pending",
     },
 
     orderStatus: {
       type: String,
+
       enum: [
         "placed",
         "confirmed",
@@ -83,14 +103,19 @@ const orderSchema = new mongoose.Schema(
         "delivered",
         "cancelled",
       ],
+
       default: "placed",
     },
   },
+
   {
     timestamps: true,
   }
 );
 
-const Order = mongoose.model("Order", orderSchema);
+const Order = mongoose.model(
+  "Order",
+  orderSchema
+);
 
 module.exports = Order;

@@ -1,4 +1,8 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
 
 import Navbar from "../components/Navbar";
 import ProtectedRoute from "./ProtectedRoute";
@@ -14,6 +18,9 @@ import Profile from "../pages/Profile";
 import Checkout from "../pages/Checkout";
 import OrderDetails from "../pages/OrderDetails";
 import RestaurantDashboard from "../pages/RestaurantDashboard";
+import RestaurantSetup from "../pages/RestaurantSetup";
+import AdminDashboard from "../pages/AdminDashboard";
+import Favorites from "../pages/Favorites";
 
 function AppRoutes() {
   return (
@@ -21,9 +28,10 @@ function AppRoutes() {
       <Navbar />
 
       <Routes>
-        {/* Public Routes */}
-
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={<Home />}
+        />
 
         <Route
           path="/login"
@@ -42,7 +50,9 @@ function AppRoutes() {
 
         <Route
           path="/restaurants/:id"
-          element={<RestaurantDetails />}
+          element={
+            <RestaurantDetails />
+          }
         />
 
         <Route
@@ -50,7 +60,16 @@ function AppRoutes() {
           element={<Cart />}
         />
 
-        {/* Protected Routes */}
+
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/checkout"
@@ -88,14 +107,35 @@ function AppRoutes() {
           }
         />
 
+
         <Route
-  path="/restaurant-dashboard"
-  element={
-    <ProtectedRoute role="restaurant">
-      <RestaurantDashboard />
-    </ProtectedRoute>
-  }
-/>
+          path="/restaurant-setup"
+          element={
+            <ProtectedRoute role="restaurant">
+              <RestaurantSetup />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/restaurant-dashboard"
+          element={
+            <ProtectedRoute role="restaurant">
+              <RestaurantDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
       </Routes>
     </BrowserRouter>
   );

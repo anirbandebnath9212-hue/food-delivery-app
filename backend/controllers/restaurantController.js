@@ -1,4 +1,5 @@
 const Restaurant = require("../models/Restaurant");
+const cloudinary = require("../config/cloudinary");
 
 // Create restaurant
 const createRestaurant = async (req, res) => {
@@ -6,7 +7,6 @@ const createRestaurant = async (req, res) => {
     const {
       name,
       description,
-      image,
       address,
       phone,
       cuisine,
@@ -19,10 +19,47 @@ const createRestaurant = async (req, res) => {
       });
     }
 
+    // Check if this user already owns a restaurant
+    const existingRestaurant = await Restaurant.findOne({
+      owner: req.user._id,
+    });
+
+    if (existingRestaurant) {
+      return res.status(400).json({
+        message: "You already have a restaurant",
+      });
+    }
+
+    let imageUrl = "";
+
+    // Upload restaurant image to Cloudinary
+    if (req.file) {
+      const uploadResult =
+        await new Promise((resolve, reject) => {
+          const uploadStream =
+            cloudinary.uploader.upload_stream(
+              {
+                folder: "biterush/restaurants",
+              },
+              (error, result) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve(result);
+                }
+              }
+            );
+
+          uploadStream.end(req.file.buffer);
+        });
+
+      imageUrl = uploadResult.secure_url;
+    }
+
     const restaurant = await Restaurant.create({
       name,
       description,
-      image,
+      image: imageUrl,
       address,
       phone,
       cuisine,
@@ -35,6 +72,8 @@ const createRestaurant = async (req, res) => {
       restaurant,
     });
   } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       message: "Failed to create restaurant",
       error: error.message,
@@ -63,8 +102,9 @@ const getRestaurants = async (req, res) => {
 // Get single restaurant
 const getRestaurantById = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.id)
-      .populate("owner", "name email");
+    const restaurant = await Restaurant.findById(
+      req.params.id
+    ).populate("owner", "name email");
 
     if (!restaurant) {
       return res.status(404).json({
@@ -82,8 +122,6 @@ const getRestaurantById = async (req, res) => {
     });
   }
 };
-
-// Temporary: assign restaurant to logged-in user
 
 module.exports = {
   createRestaurant,

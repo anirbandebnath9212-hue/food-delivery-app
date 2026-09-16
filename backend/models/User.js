@@ -1,5 +1,30 @@
 const mongoose = require("mongoose");
 
+const addressSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    address: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -33,8 +58,36 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["customer", "restaurant", "admin"],
+      enum: [
+        "customer",
+        "restaurant",
+        "admin",
+      ],
       default: "customer",
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    favorites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Restaurant",
+      },
+    ],
+
+    favoriteFoods: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Food",
+      },
+    ],
+
+    savedAddresses: {
+      type: [addressSchema],
+      default: [],
     },
   },
   {
@@ -42,6 +95,10 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-const User = mongoose.model("User", userSchema);
+
+const User = mongoose.model(
+  "User",
+  userSchema
+);
 
 module.exports = User;
